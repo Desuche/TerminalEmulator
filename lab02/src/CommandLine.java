@@ -1,9 +1,14 @@
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Scanner;
 
 public class CommandLine {
 
-    private String currentPath = new File("").getAbsolutePath();
+    private String currentPath = new File("").getCanonicalPath();
+
+    public CommandLine() throws IOException {
+    }
 
 
     private void dir(String pathname){
@@ -62,11 +67,20 @@ public class CommandLine {
 
     }
 
+    private void cd(String pathname) throws IOException {
+        File path = new File(pathname);
+        if (!path.exists() || !path.isDirectory()){
+            System.out.printf("Unable to switch to path: %s\n",pathname);
+            return;
+        }
+        this.currentPath = pathname;
+    }
+
     private void exit(){
         System.exit(0);
     }
 
-    private void processInput(String[] input){
+    private void processInput(String[] input) throws IOException{
         if (input[0].isEmpty()){
             System.out.print(currentPath + "> ");
             return;
@@ -76,16 +90,19 @@ public class CommandLine {
 
             switch (input[0]) {
                 case "dir":
-                    dir(input[1]);
+                    dir(resolvePath(input[1]));
                     break;
                 case "md":
-                    md(input[1]);
+                    md(resolvePath(input[1]));
                     break;
                 case "rd":
-                    rd(input[1]);
+                    rd(resolvePath(input[1]));
                     break;
                 case "del":
-                    del(input[1]);
+                    del(resolvePath(input[1]));
+                    break;
+                case "cd":
+                    cd(resolvePath(input[1]));
                     break;
                 case "exit":
                     exit();
@@ -101,13 +118,40 @@ public class CommandLine {
         System.out.print(currentPath + "> ");
     }
 
-    public static void main(String[] args){
+    private String resolvePath(String pathname) throws IOException {
+        String resolvedPath;
+        int stringLength = pathname.length();
+
+        if (stringLength > 0 && pathname.charAt(0) == '"'){
+
+            if (pathname.charAt(stringLength - 1) == '"'){
+                pathname = pathname.substring(1, stringLength - 1);
+
+            } else {
+                pathname = pathname.substring(1, stringLength);
+            }
+
+        }
+
+        if (stringLength > 0 && pathname.charAt(0) == '~'){
+            pathname = pathname.substring(1, stringLength);
+            String root = Paths.get(currentPath).getRoot().toString();
+            resolvedPath = ( new File(Paths.get(root, pathname).toAbsolutePath().toString()) ).getCanonicalPath();
+            return resolvedPath;
+        }
+
+        System.out.println(pathname);
+        resolvedPath = ( new File(Paths.get(currentPath, pathname).toAbsolutePath().toString()) ).getCanonicalPath();
+        return resolvedPath;
+    }
+
+    public static void main(String[] args) throws IOException {
         CommandLine commandLine = new CommandLine();
         Scanner scanner = new Scanner(System.in);
 
         System.out.print(commandLine.currentPath + "> ");
         while (true){
-            String[] input = scanner.nextLine().split("\\s+");
+            String[] input = scanner.nextLine().split("\\s+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
             commandLine.processInput(input);
         }
     }
